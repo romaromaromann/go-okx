@@ -1,4 +1,4 @@
-module github.com/iaping/go-okx
+module github.com/romaromaromann/go-okx
 
 go 1.17
 

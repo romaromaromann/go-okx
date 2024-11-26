@@ -1,6 +1,6 @@
 package asset
 
-import "github.com/iaping/go-okx/rest/api"
+import "github.com/romaromaromann/go-okx/rest/api"
 
 func NewPostTransfer(param *PostTransferParam) (api.IRequest, api.IResponse) {
 	return &api.Request{

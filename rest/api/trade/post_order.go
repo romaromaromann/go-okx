@@ -1,6 +1,6 @@
 package trade
 
-import "github.com/iaping/go-okx/rest/api"
+import "github.com/romaromaromann/go-okx/rest/api"
 
 func NewPostOrder(param *PostOrderParam) (api.IRequest, api.IResponse) {
 	return &api.Request{
@@ -23,6 +23,10 @@ type PostOrderParam struct {
 	Px         string `json:"px,omitempty"`
 	ReduceOnly bool   `json:"reduceOnly,omitempty"`
 	TgtCcy     string `json:"tgtCcy,omitempty"`
+	TPTriggerPx string `json:"tpTriggerPx,omitempty,string"` 
+	TPOrdPx     string `json:"tpOrdPx,omitempty,string"`     
+	SLTriggerPx string `json:"slTriggerPx,omitempty,string"` 
+	SLOrdPx     string `json:"slOrdPx,omitempty,string"`     
 }
 
 type PostOrderResponse struct {

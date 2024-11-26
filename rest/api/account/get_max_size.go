@@ -1,6 +1,6 @@
 package account
 
-import "github.com/iaping/go-okx/rest/api"
+import "github.com/romaromaromann/go-okx/rest/api"
 
 func NewGetMaxSize(param *GetMaxSizeParam) (api.IRequest, api.IResponse) {
 	return &api.Request{

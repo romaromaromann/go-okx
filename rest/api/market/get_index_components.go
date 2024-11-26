@@ -1,6 +1,6 @@
 package market
 
-import "github.com/iaping/go-okx/rest/api"
+import "github.com/romaromaromann/go-okx/rest/api"
 
 func NewGetIndexComponents(param *GetIndexComponentsParam) (api.IRequest, api.IResponse) {
 	return &api.Request{
