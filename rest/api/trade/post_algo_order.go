@@ -20,6 +20,9 @@ type PostAlgoOrderParam struct {
 	SLTriggerPx     float64 `json:"slTriggerPx,omitempty"`
 	SlTriggerPxType string  `json:"slTriggerPxType,omitempty,string"`
 	SLOrdPx         float64 `json:"slOrdPx,omitempty,string"`
+	TPTriggerPx     float64 `json:"tpTriggerPx,omitempty"`
+	TPTriggerPxType string  `json:"tpTriggerPxType,omitempty,string"`
+	TPOrdPx         float64 `json:"tpOrdPx,omitempty,string"`
 	CxlOnClosePos   bool    `json:"cxlOnClosePos,omitempty"`
 	ReduceOnly      bool    `json:"reduceOnly,omitempty"`
 	CloseFraction   float64 `json:"closeFraction,omitempty"`
