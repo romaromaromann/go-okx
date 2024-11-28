@@ -17,7 +17,7 @@ type PostAlgoOrderParam struct {
 	PosSide         string  `json:"posSide,omitempty"`
 	OrdType         string  `json:"ordType"`
 	Sz              string  `json:"sz"`
-	SLTriggerPx     string  `json:"slTriggerPx,omitempty,string"`
+	SLTriggerPx     float64 `json:"slTriggerPx,omitempty"`
 	SlTriggerPxType string  `json:"slTriggerPxType,omitempty,string"`
 	SLOrdPx         float64 `json:"slOrdPx,omitempty,string"`
 	CxlOnClosePos   bool    `json:"cxlOnClosePos,omitempty"`
