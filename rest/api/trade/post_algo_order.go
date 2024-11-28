@@ -22,6 +22,7 @@ type PostAlgoOrderParam struct {
 	SLOrdPx         float64 `json:"slOrdPx,omitempty,string"`
 	CxlOnClosePos   bool    `json:"cxlOnClosePos,omitempty"`
 	ReduceOnly      bool    `json:"reduceOnly,omitempty"`
+	CloseFraction   string  `json:"closeFraction,omitempty,string"`
 }
 
 type PostAlgoOrderResponse struct {
