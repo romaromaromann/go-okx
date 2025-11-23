@@ -31,6 +31,7 @@ type Instrument struct {
 	SettleCcy    string `json:"settleCcy,omitempty"`
 	CtVal        string `json:"ctVal,omitempty"`
 	CtMult       string `json:"ctMult,omitempty"`
+	CtType       string `json:"ctType,omitempty"`
 	CtValCcy     string `json:"ctValCcy,omitempty"`
 	OptType      string `json:"optType,omitempty"`
 	Stk          string `json:"stk,omitempty"`
