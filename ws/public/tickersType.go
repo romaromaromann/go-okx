@@ -33,7 +33,7 @@ type Ticker struct {
 }
 
 // default subscribe
-func SubscribeTickers(instType string, handler HandlerTickers, handlerError ws.HandlerError, simulated bool) error {
+func SubscribeTickersType(instType string, handler HandlerTickers, handlerError ws.HandlerError, simulated bool) error {
 	args := &ws.Args{
 		Channel: "tickers",
 		InstType:  instType,
