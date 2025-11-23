@@ -6,7 +6,7 @@ import (
 	"github.com/romaromaromann/go-okx/ws"
 )
 
-type HandlerTickersType func(EventTickers)
+type HandlerTickersType func(EventTickersType)
 
 type EventTickersType struct {
 	Arg  ws.Args  `json:"arg"`
