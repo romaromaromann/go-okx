@@ -6,14 +6,14 @@ import (
 	"github.com/romaromaromann/go-okx/ws"
 )
 
-type HandlerTickers func(EventTickers)
+type HandlerTickersType func(EventTickers)
 
-type EventTickers struct {
+type EventTickersType struct {
 	Arg  ws.Args  `json:"arg"`
 	Data []Ticker `json:"data"`
 }
 
-type Ticker struct {
+type TickerType struct {
 	InstType  string `json:"instType"`
 	InstId    string `json:"instId"`
 	Last      string `json:"last"`
@@ -33,14 +33,14 @@ type Ticker struct {
 }
 
 // default subscribe
-func SubscribeTickersType(instType string, handler HandlerTickers, handlerError ws.HandlerError, simulated bool) error {
+func SubscribeTickersType(instType string, handler HandlerTickersType, handlerError ws.HandlerError, simulated bool) error {
 	args := &ws.Args{
 		Channel: "tickers",
 		InstType:  instType,
 	}
 
 	h := func(message []byte) {
-		var event EventTickers
+		var event EventTickersType
 		if err := json.Unmarshal(message, &event); err != nil {
 			handlerError(err)
 			return
