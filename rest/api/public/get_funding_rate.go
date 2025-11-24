@@ -12,7 +12,7 @@ func NewGetFundingRate(param *GetFundingParam) (api.IRequest, api.IResponse) {
 }
 
 type GetFundingParam struct {
-	InstId string `url:"instId"`
+	InstId string `url:"instId"` // ANY for all symbols
 }
 
 type GetFundingResponse struct {
