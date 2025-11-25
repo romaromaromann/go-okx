@@ -1,4 +1,4 @@
-package public
+package business
 
 import (
 	"encoding/json"
@@ -24,5 +24,5 @@ func SubscribeKline(args *ws.Args, handler HandlerKline, handlerError ws.Handler
 		handler(event)
 	}
 
-	return NewPublic(simulated).Subscribe(args, h, handlerError)
+	return NewBusiness(simulated).Subscribe(args, h, handlerError)
 }
