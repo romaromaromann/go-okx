@@ -1,7 +1,9 @@
 package ws
 
 import (
+	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -19,22 +21,18 @@ const (
 	PingDeadline = 10 * time.Second
 )
 
-var (
-	DefaultClientPublic            = NewClient(EndpointPublic)
-	DefaultClientPrivate           = NewClient(EndpointPrivate)
-	DefaultClientBusiness          = NewClient(EndpointBusiness)
-	DefaultClientPublicSimulated   = NewClient(EndpointPublicSimulated)
-	DefaultClientPrivateSimulated  = NewClient(EndpointPrivateSimulated)
-	DefaultClientBusinessSimulated = NewClient(EndpointBusinessSimulated)
-
-	PingMessage = []byte("ping")
-)
+var PingMessage = []byte("ping")
 
 type OperateCallback func(*websocket.Conn) error
 
 type Client struct {
 	Endpoint string
 	Dialer   *websocket.Dialer
+}
+
+type SafeClient struct {
+	client *Client
+	mu     sync.Mutex
 }
 
 // new Client
@@ -44,7 +42,17 @@ func NewClient(endpoint string) *Client {
 	}
 }
 
-// operate
+func NewSafeClient(endpoint string) *SafeClient {
+	return &SafeClient{
+		client: &Client{
+			Endpoint: endpoint,
+			Dialer: &websocket.Dialer{
+				HandshakeTimeout: 20 * time.Second,
+			},
+		},
+	}
+}
+
 func (c *Client) Operate(operate *Operate, callback OperateCallback) error {
 	conn, _, err := c.dial()
 	if err != nil {
@@ -68,6 +76,26 @@ func (c *Client) Operate(operate *Operate, callback OperateCallback) error {
 	}
 
 	return nil
+}
+
+func (sc *SafeClient) Operate(operate *Operate, callback OperateCallback) error {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	// Safe handler
+	originalHandler := operate.Handler
+	operate.Handler = func(message []byte) {
+		defer func() {
+			if r := recover(); r != nil {
+				if operate.HandlerError != nil {
+					operate.HandlerError(fmt.Errorf("panic: %v", r))
+				}
+			}
+		}()
+		originalHandler(message)
+	}
+
+	return sc.client.Operate(operate, callback)
 }
 
 // message operate

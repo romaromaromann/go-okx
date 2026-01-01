@@ -5,17 +5,18 @@ import (
 )
 
 type Public struct {
-	C *ws.Client
+	C *ws.SafeClient
 }
 
 func NewPublic(simulated bool) *Public {
-	public := &Public{
-		C: ws.DefaultClientPublic,
-	}
+	endpoint := ws.EndpointPublic
 	if simulated {
-		public.C = ws.DefaultClientPublicSimulated
+		endpoint = ws.EndpointPublicSimulated
 	}
-	return public
+
+	return &Public{
+		C: ws.NewSafeClient(endpoint), // Новый SafeClient каждый раз
+	}
 }
 
 // subscribe
