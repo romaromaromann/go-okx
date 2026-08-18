@@ -21,7 +21,16 @@ const (
 	PingDeadline = 10 * time.Second
 )
 
-var PingMessage = []byte("ping")
+var (
+	DefaultClientPublic            = NewClient(EndpointPublic)
+	DefaultClientPrivate           = NewClient(EndpointPrivate)
+	DefaultClientBusiness          = NewClient(EndpointBusiness)
+	DefaultClientPublicSimulated   = NewClient(EndpointPublicSimulated)
+	DefaultClientPrivateSimulated  = NewClient(EndpointPrivateSimulated)
+	DefaultClientBusinessSimulated = NewClient(EndpointBusinessSimulated)
+
+	PingMessage = []byte("ping")
+)
 
 type OperateCallback func(*websocket.Conn) error
 
