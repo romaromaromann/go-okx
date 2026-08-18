@@ -24,6 +24,7 @@ type GetInstrumentsResponse struct {
 type Instrument struct {
 	InstType     string `json:"instType"`
 	InstId       string `json:"instId"`
+	InstCategory string `json:"instCategory,omitempty"`
 	BaseCcy      string `json:"baseCcy"`
 	QuoteCcy     string `json:"quoteCcy"`
 	BaseSz       string `json:"baseSz,omitempty"`
