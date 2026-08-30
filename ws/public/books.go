@@ -15,10 +15,12 @@ type EventBooks struct {
 }
 
 type Book struct {
-	Asks     [][]string `json:"asks"`
-	Bids     [][]string `json:"bids"`
-	Ts       int64      `json:"ts,string"`
-	Checksum int64      `json:"checksum"`
+	Asks      [][]string `json:"asks"`
+	Bids      [][]string `json:"bids"`
+	Ts        int64      `json:"ts,string"`
+	Checksum  int64      `json:"checksum"`
+	SeqId     int64      `json:"seqId"`
+	PrevSeqId int64      `json:"prevSeqId"`
 }
 
 // default subscribe
