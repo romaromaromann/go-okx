@@ -1,6 +1,8 @@
 package business
 
 import (
+	"sync"
+
 	"github.com/romaromaromann/go-okx/ws"
 )
 
@@ -8,17 +10,29 @@ type Business struct {
 	C *ws.Client
 }
 
+var (
+	businessClient          *ws.Client
+	businessClientSimulated *ws.Client
+	businessClientMu        sync.Mutex
+)
+
 func NewBusiness(simulated bool) *Business {
-	public := &Business{
-		C: ws.DefaultClientBusiness,
-	}
+	businessClientMu.Lock()
+	defer businessClientMu.Unlock()
+
 	if simulated {
-		public.C = ws.DefaultClientBusinessSimulated
+		if businessClientSimulated == nil {
+			businessClientSimulated = ws.DefaultClientBusinessSimulated
+		}
+		return &Business{C: businessClientSimulated}
 	}
-	return public
+
+	if businessClient == nil {
+		businessClient = ws.DefaultClientBusiness
+	}
+	return &Business{C: businessClient}
 }
 
-// subscribe
 func (p *Business) Subscribe(args interface{}, handler ws.Handler, handlerError ws.HandlerError) error {
 	subscribe := ws.NewOperateSubscribe(args, handler, handlerError)
 	return p.C.Operate(subscribe, nil)

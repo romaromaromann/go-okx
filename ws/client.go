@@ -37,6 +37,13 @@ type OperateCallback func(*websocket.Conn) error
 type Client struct {
 	Endpoint string
 	Dialer   *websocket.Dialer
+
+	mu       sync.Mutex
+	conn     *websocket.Conn
+	handlers []Handler
+	started  bool
+
+	writeMu sync.Mutex
 }
 
 type SafeClient struct {
@@ -44,7 +51,6 @@ type SafeClient struct {
 	mu     sync.Mutex
 }
 
-// new Client
 func NewClient(endpoint string) *Client {
 	return &Client{
 		Endpoint: endpoint,
@@ -62,28 +68,52 @@ func NewSafeClient(endpoint string) *SafeClient {
 	}
 }
 
+// Operate — переиспользует существующее соединение, если оно открыто.
 func (c *Client) Operate(operate *Operate, callback OperateCallback) error {
-	conn, _, err := c.dial()
-	if err != nil {
-		return err
+	c.mu.Lock()
+
+	// регистрируем handler сразу — до отправки subscribe,
+	// чтобы не потерять первые сообщения
+	if operate.Handler != nil {
+		c.handlers = append(c.handlers, operate.Handler)
 	}
 
-	if callback != nil {
-		if err := callback(conn); err != nil {
+	// соединения нет — открываем
+	if c.conn == nil {
+		conn, _, err := c.dial()
+		if err != nil {
+			c.mu.Unlock()
 			return err
+		}
+		c.conn = conn
+
+		if callback != nil {
+			if err := callback(conn); err != nil {
+				c.mu.Unlock()
+				return err
+			}
+		}
+
+		if !c.started {
+			ticker := time.NewTicker(PingTimeout)
+			go c.keepAlive(conn, ticker)
+			go c.messageLoop(conn)
+			c.started = true
 		}
 	}
 
-	if err := c.MessageOperate(conn, operate); err != nil {
-		return err
-	}
+	conn := c.conn
+	c.mu.Unlock()
 
-	if operate.Handler != nil {
-		ticker := time.NewTicker(PingTimeout)
-		go c.keepAlive(conn, ticker)
-		go c.messageLoop(conn, operate)
+	// отправляем subscribe БЕЗ ожидания ответа в этом же conn
+	// (ответ придёт в messageLoop и уйдёт во все handlers)
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	if operate.Request != nil {
+		if err := conn.WriteJSON(operate.Request); err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
@@ -91,54 +121,62 @@ func (sc *SafeClient) Operate(operate *Operate, callback OperateCallback) error 
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
-	// Safe handler
 	originalHandler := operate.Handler
-	operate.Handler = func(message []byte) {
-		defer func() {
-			if r := recover(); r != nil {
-				if operate.HandlerError != nil {
-					operate.HandlerError(fmt.Errorf("panic: %v", r))
+	if originalHandler != nil {
+		operate.Handler = func(message []byte) {
+			defer func() {
+				if r := recover(); r != nil {
+					if operate.HandlerError != nil {
+						operate.HandlerError(fmt.Errorf("panic: %v", r))
+					}
 				}
-			}
-		}()
-		originalHandler(message)
+			}()
+			originalHandler(message)
+		}
 	}
 
 	return sc.client.Operate(operate, callback)
 }
 
-// message operate
-func (c *Client) MessageOperate(conn *websocket.Conn, operate *Operate) error {
-	if operate.Request == nil {
-		return nil
-	}
-	if err := conn.WriteJSON(operate.Request); err != nil {
-		return err
-	}
-	if err := conn.ReadJSON(&operate.Response); err != nil {
-		return err
-	}
-	return operate.Response.Error()
-}
-
-// loop websocket message
-func (c *Client) messageLoop(conn *websocket.Conn, operate *Operate) {
+// messageLoop — читает ОДИН раз, раздаёт во все handlers.
+// При ошибке сбрасывает соединение, чтобы следующий Operate сделал dial.
+func (c *Client) messageLoop(conn *websocket.Conn) {
 	defer conn.Close()
+
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			operate.HandlerError(err)
+			c.mu.Lock()
+			// сбрасываем — следующий Operate переподключится
+			if c.conn == conn {
+				c.conn = nil
+				c.started = false
+				c.handlers = nil
+			}
+			c.mu.Unlock()
 			return
 		}
-		operate.Handler(message)
+
+		c.mu.Lock()
+		handlers := append([]Handler(nil), c.handlers...)
+		c.mu.Unlock()
+
+		for _, h := range handlers {
+			h(message)
+		}
 	}
 }
 
-// keep websocket alive
 func (c *Client) keepAlive(conn *websocket.Conn, ticker *time.Ticker) {
 	defer ticker.Stop()
 	for {
 		<-ticker.C
+		c.mu.Lock()
+		alive := c.conn == conn
+		c.mu.Unlock()
+		if !alive {
+			return
+		}
 		deadline := time.Now().Add(PingDeadline)
 		if err := conn.WriteControl(websocket.PingMessage, PingMessage, deadline); err != nil {
 			return
@@ -146,10 +184,17 @@ func (c *Client) keepAlive(conn *websocket.Conn, ticker *time.Ticker) {
 	}
 }
 
-// dial endpoint
 func (c *Client) dial() (*websocket.Conn, *http.Response, error) {
 	if c.Dialer == nil {
 		c.Dialer = websocket.DefaultDialer
 	}
 	return c.Dialer.Dial(c.Endpoint, nil)
+}
+
+// MessageOperate оставлен для совместимости — используется при login (private).
+func (c *Client) MessageOperate(conn *websocket.Conn, operate *Operate) error {
+	if operate.Request == nil {
+		return nil
+	}
+	return conn.WriteJSON(operate.Request)
 }

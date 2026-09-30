@@ -1,6 +1,8 @@
 package public
 
 import (
+	"sync"
+
 	"github.com/romaromaromann/go-okx/ws"
 )
 
@@ -8,18 +10,29 @@ type Public struct {
 	C *ws.SafeClient
 }
 
+var (
+	publicClient          *ws.SafeClient
+	publicClientSimulated *ws.SafeClient
+	publicClientMu        sync.Mutex
+)
+
 func NewPublic(simulated bool) *Public {
-	endpoint := ws.EndpointPublic
+	publicClientMu.Lock()
+	defer publicClientMu.Unlock()
+
 	if simulated {
-		endpoint = ws.EndpointPublicSimulated
+		if publicClientSimulated == nil {
+			publicClientSimulated = ws.NewSafeClient(ws.EndpointPublicSimulated)
+		}
+		return &Public{C: publicClientSimulated}
 	}
 
-	return &Public{
-		C: ws.NewSafeClient(endpoint), // Новый SafeClient каждый раз
+	if publicClient == nil {
+		publicClient = ws.NewSafeClient(ws.EndpointPublic)
 	}
+	return &Public{C: publicClient}
 }
 
-// subscribe
 func (p *Public) Subscribe(args interface{}, handler ws.Handler, handlerError ws.HandlerError) error {
 	subscribe := ws.NewOperateSubscribe(args, handler, handlerError)
 	return p.C.Operate(subscribe, nil)
