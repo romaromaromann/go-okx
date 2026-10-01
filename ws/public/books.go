@@ -36,3 +36,17 @@ func SubscribeBooks(args *ws.Args, handler HandlerBooks, handlerError ws.Handler
 
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
 }
+
+// SubscribeBooksOn подписывается через конкретный клиент (для отдельного соединения).
+func SubscribeBooksOn(p *Public, args *ws.Args, handler HandlerBooks, handlerError ws.HandlerError) error {
+	h := func(message []byte) {
+		var event EventBooks
+		if err := json.Unmarshal(message, &event); err != nil {
+			handlerError(err)
+			return
+		}
+		handler(event)
+	}
+
+	return p.Subscribe(args, h, handlerError)
+}

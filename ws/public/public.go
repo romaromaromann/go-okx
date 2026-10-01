@@ -33,6 +33,12 @@ func NewPublic(simulated bool) *Public {
 	return &Public{C: publicClient}
 }
 
+// NewPublicIsolated создаёт отдельный клиент/соединение (не синглтон).
+// Нужен для высоконагруженных каналов (books), чтобы не душить остальные подписки.
+func NewPublicIsolated() *Public {
+	return &Public{C: ws.NewSafeClient(ws.EndpointPublic)}
+}
+
 func (p *Public) Subscribe(args interface{}, handler ws.Handler, handlerError ws.HandlerError) error {
 	subscribe := ws.NewOperateSubscribe(args, handler, handlerError)
 	return p.C.Operate(subscribe, nil)
