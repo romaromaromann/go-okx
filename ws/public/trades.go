@@ -40,7 +40,7 @@ func SubscribeTrades(instId string, handler HandlerTrades, handlerError ws.Handl
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
 }
 
-func SubscribeTradesBatch(argsList []*ws.Args, handler HandlerTrades, handlerError ws.HandlerError, simulated bool) error {
+func SubscribeTradesBatch(argsList []*ws.Args, handler HandlerTrades, handlerError ws.HandlerError, simulated bool) (*ws.Operate, error) {
 	h := func(message []byte) {
 		var event EventTrades
 		if err := json.Unmarshal(message, &event); err != nil {
@@ -50,5 +50,7 @@ func SubscribeTradesBatch(argsList []*ws.Args, handler HandlerTrades, handlerErr
 		handler(event)
 	}
 
-	return NewPublic(simulated).Subscribe(argsList, h, handlerError)
+	operate := ws.NewOperateSubscribe(argsList, h, handlerError)
+	err := NewPublic(simulated).SubscribeOperate(operate)
+	return operate, err
 }

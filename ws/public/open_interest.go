@@ -39,7 +39,7 @@ func SubscribeOpenInterest(instId string, handler HandlerOpenInterest, handlerEr
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
 }
 
-func SubscribeOpenInterestBatch(argsList []*ws.Args, handler HandlerOpenInterest, handlerError ws.HandlerError, simulated bool) error {
+func SubscribeOpenInterestBatch(argsList []*ws.Args, handler HandlerOpenInterest, handlerError ws.HandlerError, simulated bool) (*ws.Operate, error) {
 	h := func(message []byte) {
 		var event EventOpenInterest
 		if err := json.Unmarshal(message, &event); err != nil {
@@ -49,5 +49,7 @@ func SubscribeOpenInterestBatch(argsList []*ws.Args, handler HandlerOpenInterest
 		handler(event)
 	}
 
-	return NewPublic(simulated).Subscribe(argsList, h, handlerError)
+	operate := ws.NewOperateSubscribe(argsList, h, handlerError)
+	err := NewPublic(simulated).SubscribeOperate(operate)
+	return operate, err
 }

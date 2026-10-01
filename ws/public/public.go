@@ -37,3 +37,15 @@ func (p *Public) Subscribe(args interface{}, handler ws.Handler, handlerError ws
 	subscribe := ws.NewOperateSubscribe(args, handler, handlerError)
 	return p.C.Operate(subscribe, nil)
 }
+
+func (p *Public) SubscribeOperate(operate *ws.Operate) error {
+	return p.C.Operate(operate, nil)
+}
+
+func (p *Public) Unsubscribe(operate *ws.Operate) error {
+	return p.C.Unsubscribe(operate)
+}
+
+func UnsubscribeOperate(operate *ws.Operate, simulated bool) error {
+	return NewPublic(simulated).Unsubscribe(operate)
+}

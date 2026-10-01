@@ -8,6 +8,7 @@ type Operate struct {
 	Response     *Response
 	Handler      func(message []byte)
 	HandlerError HandlerError
+	Id           int64
 }
 
 // new subscribe

@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -17,8 +19,9 @@ const (
 	EndpointPrivateSimulated  = "wss://wspap.okx.com:8443/ws/v5/private?brokerId=9999"
 	EndpointBusinessSimulated = "wss://wspap.okx.com:8443/ws/v5/business?brokerId=9999"
 
-	PingTimeout  = 20 * time.Second
-	PingDeadline = 10 * time.Second
+	PingTimeout       = 20 * time.Second
+	PingDeadline      = 10 * time.Second
+	ReconnectSubDelay = 20 * time.Millisecond
 )
 
 var (
@@ -34,13 +37,20 @@ var (
 
 type OperateCallback func(*websocket.Conn) error
 
+type subEntry struct {
+	id      int64
+	handler Handler
+}
+
 type Client struct {
 	Endpoint string
 	Dialer   *websocket.Dialer
 
 	mu       sync.Mutex
 	conn     *websocket.Conn
-	handlers []Handler
+	handlers []*subEntry
+	subs     []*Request
+	nextId   int64
 	started  bool
 
 	writeMu sync.Mutex
@@ -68,17 +78,43 @@ func NewSafeClient(endpoint string) *SafeClient {
 	}
 }
 
+func sameRequest(a, b *Request) bool {
+	if a == nil || b == nil || a.Op != b.Op {
+		return false
+	}
+	ja, err1 := json.Marshal(a.Args)
+	jb, err2 := json.Marshal(b.Args)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return bytes.Equal(ja, jb)
+}
+
+func hasSub(subs []*Request, req *Request) bool {
+	for _, s := range subs {
+		if sameRequest(s, req) {
+			return true
+		}
+	}
+	return false
+}
+
 // Operate — переиспользует существующее соединение, если оно открыто.
 func (c *Client) Operate(operate *Operate, callback OperateCallback) error {
 	c.mu.Lock()
 
-	// регистрируем handler сразу — до отправки subscribe,
-	// чтобы не потерять первые сообщения
 	if operate.Handler != nil {
-		c.handlers = append(c.handlers, operate.Handler)
+		operate.Id = c.nextId
+		c.nextId++
+		c.handlers = append(c.handlers, &subEntry{id: operate.Id, handler: operate.Handler})
 	}
 
-	// соединения нет — открываем
+	if operate.Request != nil && operate.Request.Op == OpSubscribe {
+		if !hasSub(c.subs, operate.Request) {
+			c.subs = append(c.subs, operate.Request)
+		}
+	}
+
 	if c.conn == nil {
 		conn, _, err := c.dial()
 		if err != nil {
@@ -105,14 +141,10 @@ func (c *Client) Operate(operate *Operate, callback OperateCallback) error {
 	conn := c.conn
 	c.mu.Unlock()
 
-	// отправляем subscribe БЕЗ ожидания ответа в этом же conn
-	// (ответ придёт в messageLoop и уйдёт во все handlers)
 	c.writeMu.Lock()
 	defer c.writeMu.Unlock()
 	if operate.Request != nil {
-		if err := conn.WriteJSON(operate.Request); err != nil {
-			return err
-		}
+		return conn.WriteJSON(operate.Request)
 	}
 	return nil
 }
@@ -138,32 +170,129 @@ func (sc *SafeClient) Operate(operate *Operate, callback OperateCallback) error 
 	return sc.client.Operate(operate, callback)
 }
 
-// messageLoop — читает ОДИН раз, раздаёт во все handlers.
-// При ошибке сбрасывает соединение, чтобы следующий Operate сделал dial.
+// Unsubscribe — снимает handler и подписку и отправляет unsubscribe на сервер.
+func (c *Client) Unsubscribe(operate *Operate) error {
+	if operate == nil {
+		return nil
+	}
+
+	c.mu.Lock()
+
+	if operate.Handler != nil {
+		var kept []*subEntry
+		for _, e := range c.handlers {
+			if e.id != operate.Id {
+				kept = append(kept, e)
+			}
+		}
+		c.handlers = kept
+	}
+
+	if operate.Request != nil {
+		var kept []*Request
+		for _, r := range c.subs {
+			if !sameRequest(r, operate.Request) {
+				kept = append(kept, r)
+			}
+		}
+		c.subs = kept
+	}
+
+	conn := c.conn
+	c.mu.Unlock()
+
+	if conn == nil || operate.Request == nil {
+		return nil
+	}
+
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return conn.WriteJSON(&Request{Op: OpUnsubscribe, Args: operate.Request.Args})
+}
+
+func (sc *SafeClient) Unsubscribe(operate *Operate) error {
+	if operate == nil {
+		return nil
+	}
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	return sc.client.Unsubscribe(operate)
+}
+
+// messageLoop — читает сообщения и раздаёт их во все handlers.
+// При ошибке соединения сбрасывает conn и запускает reconnect.
 func (c *Client) messageLoop(conn *websocket.Conn) {
 	defer conn.Close()
 
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			c.mu.Lock()
-			// сбрасываем — следующий Operate переподключится
-			if c.conn == conn {
-				c.conn = nil
-				c.started = false
-				c.handlers = nil
-			}
-			c.mu.Unlock()
+			c.onConnectionLost(conn)
 			return
 		}
 
 		c.mu.Lock()
-		handlers := append([]Handler(nil), c.handlers...)
+		entries := append([]*subEntry(nil), c.handlers...)
 		c.mu.Unlock()
 
-		for _, h := range handlers {
-			h(message)
+		for _, e := range entries {
+			e.handler(message)
 		}
+	}
+}
+
+func (c *Client) onConnectionLost(conn *websocket.Conn) {
+	c.mu.Lock()
+	sameConn := c.conn == conn
+	if sameConn {
+		c.conn = nil
+		c.started = false
+	}
+	c.mu.Unlock()
+
+	if sameConn {
+		go c.reconnect()
+	}
+}
+
+func (c *Client) reconnect() {
+	time.Sleep(5 * time.Second)
+
+	c.mu.Lock()
+	conn := c.conn
+	needStart := false
+	if conn == nil {
+		var err error
+		conn, _, err = c.dial()
+		if err != nil {
+			c.mu.Unlock()
+			go c.reconnect()
+			return
+		}
+		c.conn = conn
+		c.started = true
+		needStart = true
+	}
+	subsCopy := append([]*Request(nil), c.subs...)
+	c.mu.Unlock()
+
+	for _, sub := range subsCopy {
+		select {
+		case <-time.After(ReconnectSubDelay):
+		default:
+		}
+		c.writeMu.Lock()
+		err := conn.WriteJSON(sub)
+		c.writeMu.Unlock()
+		if err != nil {
+			break
+		}
+	}
+
+	if needStart {
+		ticker := time.NewTicker(PingTimeout)
+		go c.keepAlive(conn, ticker)
+		go c.messageLoop(conn)
 	}
 }
 
@@ -179,6 +308,8 @@ func (c *Client) keepAlive(conn *websocket.Conn, ticker *time.Ticker) {
 		}
 		deadline := time.Now().Add(PingDeadline)
 		if err := conn.WriteControl(websocket.PingMessage, PingMessage, deadline); err != nil {
+			conn.Close()
+			c.onConnectionLost(conn)
 			return
 		}
 	}

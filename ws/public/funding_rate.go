@@ -40,7 +40,7 @@ func SubscribeFundingRate(instId string, handler HandlerFundingRate, handlerErro
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
 }
 
-func SubscribeFundingRateBatch(argsList []*ws.Args, handler HandlerFundingRate, handlerError ws.HandlerError, simulated bool) error {
+func SubscribeFundingRateBatch(argsList []*ws.Args, handler HandlerFundingRate, handlerError ws.HandlerError, simulated bool) (*ws.Operate, error) {
 	h := func(message []byte) {
 		var event EventFundingRate
 		if err := json.Unmarshal(message, &event); err != nil {
@@ -50,5 +50,7 @@ func SubscribeFundingRateBatch(argsList []*ws.Args, handler HandlerFundingRate, 
 		handler(event)
 	}
 
-	return NewPublic(simulated).Subscribe(argsList, h, handlerError)
+	operate := ws.NewOperateSubscribe(argsList, h, handlerError)
+	err := NewPublic(simulated).SubscribeOperate(operate)
+	return operate, err
 }

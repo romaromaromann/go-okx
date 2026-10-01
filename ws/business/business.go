@@ -37,3 +37,15 @@ func (p *Business) Subscribe(args interface{}, handler ws.Handler, handlerError 
 	subscribe := ws.NewOperateSubscribe(args, handler, handlerError)
 	return p.C.Operate(subscribe, nil)
 }
+
+func (p *Business) SubscribeOperate(operate *ws.Operate) error {
+	return p.C.Operate(operate, nil)
+}
+
+func (p *Business) Unsubscribe(operate *ws.Operate) error {
+	return p.C.Unsubscribe(operate)
+}
+
+func UnsubscribeOperate(operate *ws.Operate, simulated bool) error {
+	return NewBusiness(simulated).Unsubscribe(operate)
+}
