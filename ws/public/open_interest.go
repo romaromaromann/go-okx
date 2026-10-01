@@ -21,7 +21,6 @@ type OpenInterest struct {
 	Ts       int64  `json:"ts,string"`
 }
 
-// default subscribe
 func SubscribeOpenInterest(instId string, handler HandlerOpenInterest, handlerError ws.HandlerError, simulated bool) error {
 	args := &ws.Args{
 		Channel: "open-interest",
@@ -38,4 +37,17 @@ func SubscribeOpenInterest(instId string, handler HandlerOpenInterest, handlerEr
 	}
 
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
+}
+
+func SubscribeOpenInterestBatch(argsList []*ws.Args, handler HandlerOpenInterest, handlerError ws.HandlerError, simulated bool) error {
+	h := func(message []byte) {
+		var event EventOpenInterest
+		if err := json.Unmarshal(message, &event); err != nil {
+			handlerError(err)
+			return
+		}
+		handler(event)
+	}
+
+	return NewPublic(simulated).Subscribe(argsList, h, handlerError)
 }

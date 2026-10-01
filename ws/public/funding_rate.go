@@ -22,7 +22,6 @@ type FundingRate struct {
 	NextFundingTime int64  `json:"nextFundingTime,string"`
 }
 
-// default subscribe
 func SubscribeFundingRate(instId string, handler HandlerFundingRate, handlerError ws.HandlerError, simulated bool) error {
 	args := &ws.Args{
 		Channel: "funding-rate",
@@ -39,4 +38,17 @@ func SubscribeFundingRate(instId string, handler HandlerFundingRate, handlerErro
 	}
 
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
+}
+
+func SubscribeFundingRateBatch(argsList []*ws.Args, handler HandlerFundingRate, handlerError ws.HandlerError, simulated bool) error {
+	h := func(message []byte) {
+		var event EventFundingRate
+		if err := json.Unmarshal(message, &event); err != nil {
+			handlerError(err)
+			return
+		}
+		handler(event)
+	}
+
+	return NewPublic(simulated).Subscribe(argsList, h, handlerError)
 }

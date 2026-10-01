@@ -22,7 +22,6 @@ type Trade struct {
 	Ts      int64  `json:"ts,string"`
 }
 
-// default subscribe
 func SubscribeTrades(instId string, handler HandlerTrades, handlerError ws.HandlerError, simulated bool) error {
 	args := &ws.Args{
 		Channel: "trades",
@@ -39,4 +38,17 @@ func SubscribeTrades(instId string, handler HandlerTrades, handlerError ws.Handl
 	}
 
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
+}
+
+func SubscribeTradesBatch(argsList []*ws.Args, handler HandlerTrades, handlerError ws.HandlerError, simulated bool) error {
+	h := func(message []byte) {
+		var event EventTrades
+		if err := json.Unmarshal(message, &event); err != nil {
+			handlerError(err)
+			return
+		}
+		handler(event)
+	}
+
+	return NewPublic(simulated).Subscribe(argsList, h, handlerError)
 }

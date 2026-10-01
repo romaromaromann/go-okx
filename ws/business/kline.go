@@ -26,3 +26,16 @@ func SubscribeKline(args *ws.Args, handler HandlerKline, handlerError ws.Handler
 
 	return NewBusiness(simulated).Subscribe(args, h, handlerError)
 }
+
+func SubscribeKlineBatch(argsList []*ws.Args, handler HandlerKline, handlerError ws.HandlerError, simulated bool) error {
+	h := func(message []byte) {
+		var event EventKline
+		if err := json.Unmarshal(message, &event); err != nil {
+			handlerError(err)
+			return
+		}
+		handler(event)
+	}
+
+	return NewBusiness(simulated).Subscribe(argsList, h, handlerError)
+}

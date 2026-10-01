@@ -1,5 +1,7 @@
 package ws
 
+import "reflect"
+
 const (
 	OpSubscribe   = "subscribe"
 	OpUnsubscribe = "unsubscribe"
@@ -11,20 +13,20 @@ type Request struct {
 	Args interface{} `json:"args"`
 }
 
-// new request for subscribe
 func NewRequestSubscribe(args interface{}) *Request {
 	return NewRequest(OpSubscribe, args)
 }
 
-// new request for login
 func NewRequestLogin(args interface{}) *Request {
 	return NewRequest(OpLogin, args)
 }
 
-// new request
 func NewRequest(op string, args interface{}) *Request {
-	return &Request{
-		Op:   op,
-		Args: []interface{}{args},
+	if args != nil {
+		kind := reflect.ValueOf(args).Kind()
+		if kind == reflect.Slice || kind == reflect.Array {
+			return &Request{Op: op, Args: args}
+		}
 	}
+	return &Request{Op: op, Args: []interface{}{args}}
 }

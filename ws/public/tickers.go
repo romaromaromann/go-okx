@@ -32,7 +32,6 @@ type Ticker struct {
 	Ts        int64  `json:"ts,string"`
 }
 
-// default subscribe
 func SubscribeTickers(instId string, handler HandlerTickers, handlerError ws.HandlerError, simulated bool) error {
 	args := &ws.Args{
 		Channel: "tickers",
@@ -49,4 +48,17 @@ func SubscribeTickers(instId string, handler HandlerTickers, handlerError ws.Han
 	}
 
 	return NewPublic(simulated).Subscribe(args, h, handlerError)
+}
+
+func SubscribeTickersBatch(argsList []*ws.Args, handler HandlerTickers, handlerError ws.HandlerError, simulated bool) error {
+	h := func(message []byte) {
+		var event EventTickers
+		if err := json.Unmarshal(message, &event); err != nil {
+			handlerError(err)
+			return
+		}
+		handler(event)
+	}
+
+	return NewPublic(simulated).Subscribe(argsList, h, handlerError)
 }
